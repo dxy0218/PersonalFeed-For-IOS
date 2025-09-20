@@ -83,10 +83,3 @@ struct FeedRowView: View {
     }
 }
 
-#Preview {
-    List {
-        FeedRowView(item: .sample)
-        FeedRowView(item: .samples[0])
-        FeedRowView(item: .samples[1])
-    }
-}

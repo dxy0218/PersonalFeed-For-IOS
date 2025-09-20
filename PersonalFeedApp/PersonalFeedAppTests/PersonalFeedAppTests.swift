@@ -5,13 +5,25 @@
 //  Created by francis on 9/18/25.
 //
 
-import Testing
+import XCTest
 @testable import PersonalFeedApp
 
-struct PersonalFeedAppTests {
+final class PersonalFeedAppTests: XCTestCase {
 
-    @Test func example() async throws {
-        // Write your test here and use APIs like `#expect(...)` to check expected conditions.
+    func testShortcutRouteParsing() {
+        let router = AppRouter.shared
+        XCTAssertEqual(router.route(fromShortcutType: "com.example.shortcut.settings", userInfo: nil), .settings)
+        XCTAssertEqual(router.route(fromShortcutType: "com.example.shortcut.new", userInfo: nil), .newItem)
+        XCTAssertEqual(
+            router.route(
+                fromShortcutType: "com.example.shortcut.category.news",
+                userInfo: ["category": "news" as NSString]
+            ),
+            .category("news")
+        )
+        XCTAssertEqual(
+            router.route(fromShortcutType: "com.example.shortcut.category.projects", userInfo: nil),
+            .category("projects")
+        )
     }
-
 }
