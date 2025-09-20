@@ -25,6 +25,8 @@ struct FeedItem: Identifiable, Codable, Equatable {
 
     /// 译文缓存：key 形如 "title:zh" / "body:zh" / "title:en"
     var translations: [String: String]? = nil
+    /// 抓取内容解析出的段落，用于在详情页展开查看更多内容。
+    var extractedParagraphs: [String]? = nil
 
     init(
         id: UUID = UUID(),
@@ -40,7 +42,8 @@ struct FeedItem: Identifiable, Codable, Equatable {
         sourceDescription: String? = nil,
         sourceDomain: String? = nil,
         lastImageRefresh: Date? = nil,
-        translations: [String: String]? = nil
+        translations: [String: String]? = nil,
+        extractedParagraphs: [String]? = nil
     ) {
         self.id = id
         self.title = title
@@ -56,5 +59,6 @@ struct FeedItem: Identifiable, Codable, Equatable {
         self.sourceDomain = sourceDomain
         self.lastImageRefresh = lastImageRefresh
         self.translations = translations
+        self.extractedParagraphs = extractedParagraphs
     }
 }

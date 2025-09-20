@@ -7,6 +7,7 @@ final class FeedViewModel: ObservableObject {
     @Published var selectedTags: Set<String> = []
     @Published var sortNewestFirst: Bool = true
     @Published var selectedCategory: FeedCategory? = nil
+    @Published var refreshProgress: RefreshProgress? = nil
 
     private var cancellables = Set<AnyCancellable>()
 
@@ -39,26 +40,39 @@ final class FeedViewModel: ObservableObject {
     }
 
     // MARK: CRUD
-    func add(_ item: FeedItem) {
-        var it = item
-        if it.sourceDomain == nil, let host = it.sourceURL?.host?.lowercased() {
-            it.sourceDomain = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
-        }
-        items.insert(it, at: 0)
-        Task.detached { [weak self] in await self?.refreshPreviewIfNeeded(for: it.id) }
-    }
+    func add(_ item: FeedItem) { persist(item, replacing: nil) }
 
     func update(_ item: FeedItem) {
         guard let idx = items.firstIndex(where: { $0.id == item.id }) else { return }
-        var it = item
-        if it.sourceDomain == nil, let host = it.sourceURL?.host?.lowercased() {
-            it.sourceDomain = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
-        }
-        items[idx] = it
-        Task.detached { [weak self] in await self?.refreshPreviewIfNeeded(for: it.id) }
+        persist(item, replacing: idx)
+    }
+
+    /// 如果存在则更新，不存在则新增。
+    func save(_ item: FeedItem) {
+        let existingIndex = items.firstIndex(where: { $0.id == item.id })
+        persist(item, replacing: existingIndex)
     }
 
     func delete(_ item: FeedItem) { items.removeAll { $0.id == item.id } }
+
+    private func persist(_ item: FeedItem, replacing index: Int?) {
+        var normalized = item
+        if normalized.sourceDomain == nil, let host = normalized.sourceURL?.host?.lowercased() {
+            normalized.sourceDomain = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        }
+
+        if let idx = index {
+            items[idx] = normalized
+        } else {
+            items.insert(normalized, at: 0)
+        }
+
+        schedulePreviewRefresh(for: normalized.id)
+    }
+
+    private func schedulePreviewRefresh(for id: UUID) {
+        Task { [weak self] in await self?.refreshPreviewIfNeeded(for: id) }
+    }
 
     // MARK: 排序/过滤
     private var rankedItems: [FeedItem] {
@@ -98,7 +112,7 @@ final class FeedViewModel: ObservableObject {
     }
 
     @MainActor
-    private func applyContent(_ content: ArticleContent?, for id: UUID) {
+    func applyContent(_ content: ArticleContent?, for id: UUID) {
         guard let idx = items.firstIndex(where: { $0.id == id }) else { return }
         if let c = content {
             if items[idx].imageURL == nil   { items[idx].imageURL = c.imageURL }
@@ -108,6 +122,9 @@ final class FeedViewModel: ObservableObject {
                 items[idx].body = summary
             } else if items[idx].sourceDescription == nil {
                 items[idx].sourceDescription = c.summary
+            }
+            if (items[idx].extractedParagraphs?.isEmpty ?? true) && !c.paragraphs.isEmpty {
+                items[idx].extractedParagraphs = c.paragraphs
             }
         }
         items[idx].lastImageRefresh = Date()
@@ -122,17 +139,31 @@ final class FeedViewModel: ObservableObject {
         return true
     }
 
+    @MainActor
     func refreshMissingPreviews() async {
-        for it in items where shouldRefresh(it) {
+        let targets = items.filter { shouldRefresh($0) }
+        guard !targets.isEmpty else {
+            refreshProgress = nil
+            return
+        }
+
+        refreshProgress = RefreshProgress(kind: .previews, completed: 0, total: targets.count)
+
+        for (index, it) in targets.enumerated() {
             await refreshPreviewIfNeeded(for: it.id)
+            refreshProgress = RefreshProgress(kind: .previews, completed: index + 1, total: targets.count)
+        }
+
+        if let final = refreshProgress {
+            scheduleProgressReset(for: final)
         }
     }
 
     /// 抓取受 DomainPolicy 约束；失败也会记 lastImageRefresh
     func refreshPreviewIfNeeded(for id: UUID) async {
-        guard let item = items.first(where: { $0.id == id }),
-              let page = item.sourceURL,
-              shouldRefresh(item) else { return }
+        guard let snapshot = await itemSnapshot(withId: id),
+              let page = snapshot.sourceURL,
+              shouldRefresh(snapshot) else { return }
 
         if DomainPolicy.shared.permit(url: page) == false {
             await MainActor.run { self.applyContent(nil, for: id) }
@@ -150,11 +181,66 @@ final class FeedViewModel: ObservableObject {
         }
     }
 
+    private func itemSnapshot(withId id: UUID) async -> FeedItem? {
+        await MainActor.run { items.first(where: { $0.id == id }) }
+    }
+
+    @MainActor
+    private func scheduleProgressReset(for state: RefreshProgress, delay: UInt64 = 400_000_000) {
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: delay)
+            await MainActor.run {
+                if self?.refreshProgress == state {
+                    self?.refreshProgress = nil
+                }
+            }
+        }
+    }
+
     // MARK: - 一键替换为默认源（RSS）
     @MainActor func replaceWithDefaultSources(limitPerFeed: Int = 3) async {
-        let fetched = await FeedIngestor.ingestDefault(limitPerFeed: limitPerFeed)
+        refreshProgress = RefreshProgress(kind: .ingestion, completed: 0, total: FeedIngestor.defaultFeeds.count)
+        let fetched = await FeedIngestor.ingestDefault(limitPerFeed: limitPerFeed) { [weak self] completed, total in
+            Task { @MainActor in
+                self?.refreshProgress = RefreshProgress(kind: .ingestion, completed: completed, total: total)
+            }
+        }
         self.items = fetched
+        if let final = refreshProgress {
+            scheduleProgressReset(for: final)
+        }
         await refreshMissingPreviews()
+    }
+}
+
+extension FeedViewModel {
+    struct RefreshProgress: Equatable {
+        enum Kind: Equatable {
+            case previews
+            case ingestion
+        }
+
+        var kind: Kind
+        var completed: Int
+        var total: Int
+
+        var fraction: Double {
+            guard total > 0 else { return 0 }
+            return Double(min(completed, total)) / Double(total)
+        }
+
+        var statusText: String {
+            switch kind {
+            case .previews: return "抓取预览"
+            case .ingestion: return "同步信息源"
+            }
+        }
+
+        var detailText: String {
+            guard total > 0 else { return "0/0" }
+            let clamped = min(completed, total)
+            return "\(clamped)/\(total)"
+        }
     }
 }
 

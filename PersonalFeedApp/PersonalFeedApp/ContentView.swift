@@ -1,5 +1,4 @@
 import SwiftUI
-import Combine
 
 struct ContentView: View {
     @StateObject private var vm = FeedViewModel()
@@ -9,47 +8,65 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // 顶部分类条
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        Button {
-                            vm.selectedCategory = nil
-                        } label: {
-                            Text("全部")
-                                .padding(.horizontal, 12).padding(.vertical, 6)
-                                .background((vm.selectedCategory == nil) ? Color.accentColor.opacity(0.2) : Color.gray.opacity(0.15))
-                                .cornerRadius(10)
-                        }
-                        ForEach(FeedCategory.allCases) { c in
-                            Button {
-                                vm.selectedCategory = c
-                            } label: {
-                                Text(displayName(of: c))
-                                    .padding(.horizontal, 12).padding(.vertical, 6)
-                                    .background((vm.selectedCategory == c) ? Color.accentColor.opacity(0.2) : Color.gray.opacity(0.15))
-                                    .cornerRadius(10)
+            ZStack(alignment: .top) {
+                Color(.systemGroupedBackground)
+                    .ignoresSafeArea()
+
+                VStack(spacing: 0) {
+                    if let progress = vm.refreshProgress {
+                        RefreshStatusView(progress: progress)
+                            .padding(.top, 12)
+                            .padding(.bottom, 4)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            Button { vm.selectedCategory = nil } label: {
+                                Text("全部")
+                                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background((vm.selectedCategory == nil) ? Color.accentColor.opacity(0.18) : Color.gray.opacity(0.12))
+                                    .clipShape(Capsule())
+                            }
+                            ForEach(FeedCategory.allCases) { c in
+                                Button { vm.selectedCategory = c } label: {
+                                    Text(displayName(of: c))
+                                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background((vm.selectedCategory == c) ? Color.accentColor.opacity(0.18) : Color.gray.opacity(0.12))
+                                        .clipShape(Capsule())
+                                }
                             }
                         }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                }
 
-                List {
-                    ForEach(vm.filteredItems) { item in
-                        FeedRowView(item: item)
-                            .contentShape(Rectangle())
-                            .onTapGesture { selectedItem = item }
+                    List {
+                        ForEach(vm.filteredItems) { item in
+                            FeedRowView(item: item)
+                                .contentShape(Rectangle())
+                                .onTapGesture { selectedItem = item }
+                                .listRowInsets(EdgeInsets(top: 12, leading: 0, bottom: 12, trailing: 0))
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                        }
+                        .onDelete { idxSet in
+                            idxSet
+                                .compactMap { vm.filteredItems[$0] }
+                                .forEach { vm.delete($0) }
+                        }
                     }
-                    .onDelete { idxSet in
-                        idxSet
-                            .compactMap { vm.filteredItems[$0] }
-                            .forEach { vm.delete($0) }
-                    }
+                    .environment(\.defaultMinListRowHeight, 0)
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .background(Color.clear)
+                    .refreshable { await vm.refreshAll() }
                 }
-                .listStyle(.inset)
-                .refreshable { await vm.refreshAll() }
+                .animation(.easeInOut(duration: 0.25), value: vm.refreshProgress)
             }
             .navigationTitle("个人信息流")
             .toolbar {
@@ -84,5 +101,36 @@ struct ContentView: View {
         case .sports:   return "体育"
         case .finance:  return "财经"
         }
+    }
+}
+
+private struct RefreshStatusView: View {
+    let progress: FeedViewModel.RefreshProgress
+
+    private var iconName: String {
+        switch progress.kind {
+        case .previews: return "arrow.triangle.2.circlepath"
+        case .ingestion: return "dot.radiowaves.left.and.right"
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label(progress.statusText, systemImage: iconName)
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                Spacer()
+                Text(progress.detailText)
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+            ProgressView(value: progress.fraction)
+                .progressViewStyle(.linear)
+                .tint(.accentColor)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
     }
 }
