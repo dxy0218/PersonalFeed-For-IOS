@@ -146,6 +146,27 @@ final class PersonalFeedAppTests: XCTestCase {
         XCTAssertLessThanOrEqual(cache.cacheSize(), 500_000)
     }
 
+    func testDefaultFeedCatalogIntegrity() {
+        // 每个分类至少应包含 20 个源。
+        let grouped = Dictionary(grouping: FeedIngestor.defaultFeeds, by: { $0.0 })
+        FeedCategory.allCases.forEach { category in
+            let count = grouped[category]?.count ?? 0
+            XCTAssertGreaterThanOrEqual(
+                count,
+                20,
+                "Category \(category.rawValue) should have at least 20 feeds"
+            )
+        }
+
+        // URL 必须合法且不能重复。
+        let invalidFeeds = FeedIngestor.defaultFeeds.filter { URL(string: $0.1) == nil }
+        XCTAssertTrue(invalidFeeds.isEmpty, "Default catalog should not contain invalid URLs")
+
+        let duplicateFeeds = Dictionary(grouping: FeedIngestor.defaultFeeds, by: { $0.1.lowercased() })
+            .filter { $0.value.count > 1 }
+        XCTAssertTrue(duplicateFeeds.isEmpty, "Default catalog should not contain duplicate URLs")
+    }
+
     private func makeSolidImageData(size: CGSize, color: UIColor = .red) -> Data {
         let format = UIGraphicsImageRendererFormat.default()
         format.scale = 1
