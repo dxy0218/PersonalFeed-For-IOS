@@ -1,5 +1,4 @@
 import SwiftUI
-import Combine
 
 struct EditFeedView: View {
     @ObservedObject var vm: FeedViewModel
@@ -11,13 +10,7 @@ struct EditFeedView: View {
 
     init(vm: FeedViewModel, initialItem: FeedItem?) {
         self.vm = vm
-        let seed = initialItem ?? FeedItem(
-            title: "",
-            body: "",
-            date: Date(),
-            tags: [],
-            category: .news
-        )
+        let seed = initialItem ?? FeedItem.makeEmpty()
         _editingItem = State(initialValue: seed)
         _urlText = State(initialValue: seed.sourceURL?.absoluteString ?? "")
         self.isNew = (initialItem == nil)
@@ -102,7 +95,3 @@ struct EditFeedView: View {
     }
 }
 
-#Preview {
-    let vm = FeedViewModel()
-    return NavigationStack { EditFeedView(vm: vm, initialItem: .sample) }
-}
