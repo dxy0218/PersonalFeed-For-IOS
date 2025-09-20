@@ -1,5 +1,4 @@
 import SwiftUI
-import Combine
 
 struct EditFeedView: View {
     @ObservedObject var vm: FeedViewModel
@@ -11,13 +10,7 @@ struct EditFeedView: View {
 
     init(vm: FeedViewModel, initialItem: FeedItem?) {
         self.vm = vm
-        let seed = initialItem ?? FeedItem(
-            title: "",
-            body: "",
-            date: Date(),
-            tags: [],
-            category: .news
-        )
+        let seed = initialItem ?? FeedItem.makeEmpty()
         _editingItem = State(initialValue: seed)
         _urlText = State(initialValue: seed.sourceURL?.absoluteString ?? "")
         self.isNew = (initialItem == nil)
@@ -68,19 +61,8 @@ struct EditFeedView: View {
             editingItem.sourceDomain = nil
         }
 
-        if vm.filteredItems.first(where: { $0.id == editingItem.id }) != nil || vmAllContains(editingItem.id) {
-            vm.update(editingItem)
-        } else {
-            vm.add(editingItem)
-        }
+        vm.save(editingItem)
         dismiss()
-    }
-
-    private func vmAllContains(_ id: UUID) -> Bool {
-        Mirror(reflecting: vm).children
-            .first { $0.label == "items" }
-            .flatMap { $0.value as? [FeedItem] }?
-            .contains(where: { $0.id == id }) ?? false
     }
 
     private func binding<T>(_ keyPath: WritableKeyPath<FeedItem, T>) -> Binding<T> {
@@ -102,7 +84,3 @@ struct EditFeedView: View {
     }
 }
 
-#Preview {
-    let vm = FeedViewModel()
-    return NavigationStack { EditFeedView(vm: vm, initialItem: .sample) }
-}

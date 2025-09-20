@@ -2,52 +2,97 @@ import SwiftUI
 
 struct FeedDetailView: View {
     let item: FeedItem
-    @Environment(\.dismiss) private var dismiss
     @State private var showingShare = false
     @State private var showTranslated = true
     @State private var isTranslating = false
+    @State private var showMoreContent = false
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(spacing: 22) {
                 if let url = item.imageURL {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .empty: ZStack { Rectangle().fill(Color.gray.opacity(0.15)); ProgressView() }
-                        case .success(let image): image.resizable().scaledToFill()
-                        case .failure: placeholder
-                        @unknown default: placeholder
+                    AsyncCachedImage(url: url, contentMode: .fill, height: 240)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 240)
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(Color.black.opacity(0.06), lineWidth: 0.6))
+                        .shadow(color: Color.black.opacity(0.06), radius: 12, x: 0, y: 6)
+                }
+
+                VStack(alignment: .leading, spacing: 18) {
+                    Text(currentTitle)
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .lineSpacing(4)
+
+                    if let desc = currentBody {
+                        Text(desc)
+                            .font(.system(size: 16, weight: .regular, design: .rounded))
+                            .foregroundStyle(.secondary)
+                            .lineSpacing(5)
+                    }
+
+                    if let paragraphs = detailedParagraphs, !paragraphs.isEmpty {
+                        Divider()
+                            .padding(.vertical, 6)
+
+                        DisclosureGroup(isExpanded: $showMoreContent) {
+                            VStack(alignment: .leading, spacing: 14) {
+                                ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, para in
+                                    Text(para)
+                                        .font(.system(size: 15, weight: .regular, design: .rounded))
+                                        .foregroundStyle(.secondary)
+                                        .lineSpacing(5)
+                                }
+                            }
+                            .padding(.top, 10)
+                        } label: {
+                            Label(showMoreContent ? "收起更多内容" : "展开更多内容", systemImage: showMoreContent ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                                .foregroundStyle(.primary)
+                        }
+                        .tint(.primary)
+                    }
+
+                    HStack(spacing: 14) {
+                        Label(formatDate(item.date), systemImage: "calendar")
+                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
+                        if let domain = item.sourceDomain, !domain.isEmpty {
+                            Label(domain, systemImage: "globe")
+                                .font(.system(size: 13, weight: .medium, design: .rounded))
+                                .foregroundStyle(.secondary)
+                        }
+                        Text(displayName(of: item.category))
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Color.accentColor.opacity(0.16))
+                            .clipShape(Capsule())
+                        Spacer(minLength: 0)
+                        if item.viewCount > 0 {
+                            Label("\(item.viewCount)", systemImage: "eye")
+                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .foregroundStyle(.secondary)
                         }
                     }
-                    .frame(maxWidth: .infinity).frame(height: 220).clipped().cornerRadius(12)
                 }
-
-                Text(currentTitle)
-                    .font(.title2.weight(.semibold))
-
-                if let desc = currentBody {
-                    Text(desc).font(.body).foregroundStyle(.secondary).lineSpacing(3)
-                }
-
-                HStack(spacing: 12) {
-                    Label(formatDate(item.date), systemImage: "calendar")
-                        .font(.caption).foregroundStyle(.secondary)
-                    if let domain = item.sourceDomain, !domain.isEmpty {
-                        Label(domain, systemImage: "globe").font(.caption).foregroundStyle(.secondary)
-                    }
-                    Text(displayName(of: item.category))
-                        .font(.caption2)
-                        .padding(.horizontal, 6).padding(.vertical, 2)
-                        .background(Color.accentColor.opacity(0.12))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                    Spacer(minLength: 0)
-                    if item.viewCount > 0 {
-                        Label("\(item.viewCount)", systemImage: "eye").font(.caption).foregroundStyle(.secondary)
-                    }
-                }
+                .padding(.vertical, 24)
+                .padding(.horizontal, 22)
+                .background(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .fill(Color(.secondarySystemBackground))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(Color.black.opacity(0.05), lineWidth: 0.6)
+                )
+                .shadow(color: Color.black.opacity(0.05), radius: 12, x: 0, y: 6)
             }
-            .padding()
+            .padding(.horizontal, 20)
+            .padding(.vertical, 26)
         }
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle("详情")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -137,10 +182,10 @@ struct FeedDetailView: View {
         return (s?.isEmpty == false) ? s : nil
     }
 
-    // MARK: - Utils
-    private var placeholder: some View {
-        ZStack { Rectangle().fill(Color.gray.opacity(0.12)); Image(systemName: "photo").font(.system(size: 24)).foregroundStyle(.secondary) }
+    private var detailedParagraphs: [String]? {
+        item.extractedParagraphs?.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
+
     private func formatDate(_ date: Date) -> String {
         let df = DateFormatter(); df.dateStyle = .medium; df.timeStyle = .short
         return df.string(from: date)

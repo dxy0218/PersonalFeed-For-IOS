@@ -10,7 +10,7 @@ enum RankingEngine {
         let freshness = exp(-ageHours / (24.0 * 7.0))        // 0~1
 
         // 2) 热度（浏览次数，对数压缩）
-        let hot = log2(Double(max(0, item.viewCount)) + 1.0) / 6.0  // ~0..1（viewCount≈63 时接近 1）
+        let hot = log2(Double(Self.viewCount(from: item)) + 1.0) / 6.0  // ~0..1（viewCount≈63 时接近 1）
 
         // 3) 是否有图
         let hasImage = item.imageURL != nil ? 1.0 : 0.0
@@ -37,5 +37,28 @@ enum RankingEngine {
 
         let base = wFresh * freshness + wHot * hot + wImg * hasImage + wCat * cat
         return base
+    }
+}
+
+private extension RankingEngine {
+    /// 尝试从 FeedItem 中提取浏览量字段。旧版本没有该字段，为兼容做兜底。
+    static func viewCount(from item: FeedItem) -> Int {
+        let mirror = Mirror(reflecting: item)
+        if let direct = mirror.children.first(where: { $0.label == "viewCount" })?.value as? Int {
+            return max(0, direct)
+        }
+
+        // 兼容未来可能的嵌套 metrics 结构，如 metrics.viewCount / metrics.views
+        if let metrics = mirror.children.first(where: { $0.label == "metrics" })?.value {
+            let metricsMirror = Mirror(reflecting: metrics)
+            if let nested = metricsMirror.children.first(where: { child in
+                guard let label = child.label else { return false }
+                return ["viewCount", "views", "impressions"].contains(label)
+            })?.value as? Int {
+                return max(0, nested)
+            }
+        }
+
+        return 0
     }
 }

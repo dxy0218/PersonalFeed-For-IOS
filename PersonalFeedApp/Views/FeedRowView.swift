@@ -4,63 +4,74 @@ struct FeedRowView: View {
     let item: FeedItem
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .top, spacing: 14) {
             Group {
                 if let url = item.imageURL {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .empty:
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 10).fill(Color.gray.opacity(0.15))
-                                ProgressView()
-                            }
-                        case .success(let image):
-                            image.resizable().scaledToFill()
-                        case .failure:
-                            placeholder
-                        @unknown default:
-                            placeholder
-                        }
-                    }
-                } else { placeholder }
+                    AsyncCachedImage(url: url, height: 72)
+                        .transition(.opacity)
+                } else {
+                    placeholder
+                }
             }
-            .frame(width: 64, height: 64)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.black.opacity(0.05), lineWidth: 0.5))
+            .frame(width: 72, height: 72)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.black.opacity(0.06), lineWidth: 0.5))
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text(item.title.isEmpty ? (item.sourceTitle ?? "未命名") : item.title)
-                    .font(.headline)
-                    .lineLimit(2)
+                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .lineLimit(3)
+                    .lineSpacing(3)
 
                 if let desc = nonEmpty(item.body.isEmpty ? item.sourceDescription : item.body) {
-                    Text(desc).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
+                    Text(desc)
+                        .font(.system(size: 14, weight: .regular, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                        .lineSpacing(3)
                 }
 
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     if let domain = item.sourceDomain, !domain.isEmpty {
-                        Label(domain, systemImage: "globe").font(.caption).foregroundStyle(.secondary)
+                        Label(domain, systemImage: "globe")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
                     }
                     Text(displayName(of: item.category))
-                        .font(.caption2)
-                        .padding(.horizontal, 6).padding(.vertical, 2)
-                        .background(Color.accentColor.opacity(0.12))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.accentColor.opacity(0.16))
+                        .clipShape(Capsule())
                     Spacer(minLength: 0)
                     if item.viewCount > 0 {
                         Label("\(item.viewCount)", systemImage: "eye")
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 18)
+        .padding(.horizontal, 18)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color(.secondarySystemBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Color.black.opacity(0.05), lineWidth: 0.5)
+        )
+        .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
     }
 
     private var placeholder: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 10).fill(Color.gray.opacity(0.12))
-            Image(systemName: "photo").font(.system(size: 20)).foregroundStyle(.secondary)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.gray.opacity(0.1))
+            Image(systemName: "photo")
+                .font(.system(size: 22, weight: .medium, design: .rounded))
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -83,10 +94,3 @@ struct FeedRowView: View {
     }
 }
 
-#Preview {
-    List {
-        FeedRowView(item: .sample)
-        FeedRowView(item: .samples[0])
-        FeedRowView(item: .samples[1])
-    }
-}

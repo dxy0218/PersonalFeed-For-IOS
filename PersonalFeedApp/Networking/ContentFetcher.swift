@@ -4,6 +4,7 @@ struct ArticleContent {
     let title: String?
     let summary: String?
     let imageURL: URL?
+    let paragraphs: [String]
 }
 
 enum ContentFetcher {
@@ -18,24 +19,30 @@ enum ContentFetcher {
 
         // 优先在 <article>/<main>/#content 里找 <p>
         let container = firstMatch(html, pattern: "(?is)<(article|main|div[^>]*id\\s*=\\s*\"content\"[^>]*)>(.*?)</\\1>") ?? html
-        let paras = allMatches(container, pattern: "(?is)<p[^>]*>(.*?)</p>")
+        let primary = allMatches(container, pattern: "(?is)<p[^>]*>(.*?)</p>")
             .map { stripTags($0) }
             .map { collapseSpaces($0) }
-            .filter { $0.count >= 40 }               // 太短的过滤掉
-            .prefix(5)                                // 取前 5 段
-        let combined = paras.joined(separator: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { $0.count >= 40 }
 
-        // 如果没在容器中找到，退化为全局 <p>
-        let fallbackCombined: String? = {
-            if combined.isEmpty {
-                let ps = allMatches(html, pattern: "(?is)<p[^>]*>(.*?)</p>")
+        let fallbackParagraphs: [String] = {
+            if primary.isEmpty {
+                return allMatches(html, pattern: "(?is)<p[^>]*>(.*?)</p>")
                     .map { stripTags($0) }
                     .map { collapseSpaces($0) }
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                     .filter { $0.count >= 40 }
-                    .prefix(5)
-                return ps.isEmpty ? nil : ps.joined(separator: "\n\n")
             }
-            return combined
+            return Array(primary)
+        }()
+
+        let paragraphs = Array(fallbackParagraphs.prefix(8))
+        let summaryText: String? = {
+            if let desc = og.description?.trimmingCharacters(in: .whitespacesAndNewlines), !desc.isEmpty {
+                return desc
+            }
+            guard !paragraphs.isEmpty else { return nil }
+            return paragraphs.prefix(2).joined(separator: "\n\n")
         }()
 
         // 图片：优先 OG，再尝试 icon
@@ -43,8 +50,9 @@ enum ContentFetcher {
 
         return ArticleContent(
             title: og.title,
-            summary: (og.description?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 } ?? fallbackCombined,
-            imageURL: image
+            summary: summaryText,
+            imageURL: image,
+            paragraphs: paragraphs
         )
     }
 }

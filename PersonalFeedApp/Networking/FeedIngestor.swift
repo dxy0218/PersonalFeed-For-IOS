@@ -3,69 +3,212 @@ import Foundation
 /// 从主流媒体 RSS/Atom 拉取最新条目，转为 FeedItem（含分类）
 enum FeedIngestor {
 
-    /// 默认订阅清单：每类至少 5 个
-    static let defaultFeeds: [(FeedCategory, String)] = [
-        // 新闻
-        (.news, "https://feeds.bbci.co.uk/news/rss.xml"),
-        (.news, "https://rss.cnn.com/rss/edition.rss"),
-        (.news, "https://www.reuters.com/world/rss"),
-        (.news, "https://www.theguardian.com/world/rss"),
-        (.news, "https://apnews.com/hub/ap-top-news?utm_source=apnews.com&utm_medium=referral&utm_campaign=aprss"),
-        (.news, "https://www.aljazeera.com/xml/rss/all.xml"),
+    /// 默认订阅清单：涵盖主流、小众与争议媒体，每类不少于 20 个
+    static let defaultFeeds: [(FeedCategory, String)] = {
+        newsFeeds
+        + headlineFeeds
+        + projectFeeds
+        + ideaFeeds
+        + mediaFeeds
+        + scienceFeeds
+        + sportsFeeds
+        + financeFeeds
+    }()
 
-        // 头条/科技媒体
-        (.headline, "https://www.theverge.com/rss/index.xml"),
-        (.headline, "https://techcrunch.com/feed/"),
-        (.headline, "https://www.wired.com/feed/rss"),
-        (.headline, "https://www.engadget.com/rss.xml"),
-        (.headline, "https://arstechnica.com/feed/"),
+    private static let newsFeeds = feedList(.news, [
+        "https://feeds.bbci.co.uk/news/rss.xml",
+        "https://rss.cnn.com/rss/edition.rss",
+        "https://www.reuters.com/world/rss",
+        "https://www.theguardian.com/world/rss",
+        "https://apnews.com/hub/ap-top-news?utm_source=apnews.com&utm_medium=referral&utm_campaign=aprss",
+        "https://www.aljazeera.com/xml/rss/all.xml",
+        "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
+        "https://feeds.washingtonpost.com/rss/world",
+        "https://www.latimes.com/world-nation/rss2.0.xml",
+        "https://www.usatoday.com/news/rss/",
+        "https://www.politico.com/rss/politics-news.xml",
+        "https://theintercept.com/feed/?lang=en",
+        "https://www.rt.com/rss/news/",
+        "https://www.npr.org/rss/rss.php?id=1004",
+        "https://www.csmonitor.com/rss/world",
+        "https://time.com/feed/",
+        "https://www.economist.com/the-world-this-week/rss.xml",
+        "https://www.japantimes.co.jp/feed/",
+        "https://www.lemonde.fr/rss/une.xml",
+        "https://globalnews.ca/feed/"
+    ])
 
-        // 项目/产品/开发动态
-        (.projects, "https://github.blog/changelog/feed/"),
-        (.projects, "https://news.ycombinator.com/rss"),
-        (.projects, "https://producthunt.com/feed"),
-        (.projects, "https://stackoverflow.blog/feed/"),
-        (.projects, "https://aws.amazon.com/about-aws/whats-new/recent/feed/"),
+    private static let headlineFeeds = feedList(.headline, [
+        "https://www.theverge.com/rss/index.xml",
+        "https://techcrunch.com/feed/",
+        "https://www.wired.com/feed/rss",
+        "https://www.engadget.com/rss.xml",
+        "https://arstechnica.com/feed/",
+        "https://www.cnet.com/rss/news/",
+        "https://www.digitaltrends.com/feed/",
+        "https://www.androidauthority.com/feed/",
+        "https://9to5mac.com/feed/",
+        "https://www.macrumors.com/macrumors.xml",
+        "https://rss.slashdot.org/Slashdot/slashdotMain",
+        "https://www.xda-developers.com/feed/",
+        "https://www.tomshardware.com/feeds/all",
+        "https://www.pcgamer.com/rss/",
+        "https://www.gamespot.com/feeds/game-news/",
+        "https://www.gsmarena.com/rss-news-reviews.php",
+        "https://www.techradar.com/rss",
+        "https://www.zdnet.com/news/rss.xml",
+        "https://www.vice.com/en/rss",
+        "https://www.bleepingcomputer.com/feed/"
+    ])
 
-        // 灵感/人文/随笔
-        (.ideas, "https://www.themarginalian.org/feed/"),
-        (.ideas, "https://aeon.co/feed.rss"),
-        (.ideas, "https://nautil.us/feed/"),
-        (.ideas, "https://seths.blog/feed"),
-        (.ideas, "https://fs.blog/feed/"),
+    private static let projectFeeds = feedList(.projects, [
+        "https://github.blog/changelog/feed/",
+        "https://news.ycombinator.com/rss",
+        "https://www.producthunt.com/feed",
+        "https://stackoverflow.blog/feed/",
+        "https://aws.amazon.com/about-aws/whats-new/recent/feed/",
+        "https://about.gitlab.com/blog/feed/",
+        "https://medium.com/feed/tag/startups",
+        "https://www.indiehackers.com/feed",
+        "https://dev.to/feed",
+        "https://hnrss.org/frontpage",
+        "https://www.infoq.com/feed/",
+        "https://www.smashingmagazine.com/feed/",
+        "https://www.mongodb.com/blog/feed",
+        "https://www.docker.com/blog/feed/",
+        "https://blog.cloudflare.com/rss/",
+        "https://stripe.com/blog/feed.rss",
+        "https://slack.engineering/feed/",
+        "https://dropbox.tech/feed",
+        "https://www.atlassian.com/blog/feed",
+        "https://kubernetes.io/feed.xml"
+    ])
 
-        // 媒体/文化
-        (.media, "https://www.theatlantic.com/feed/all/"),
-        (.media, "https://variety.com/feed/"),
-        (.media, "https://www.newyorker.com/feed/everything"),
-        (.media, "https://www.vulture.com/rss/index.xml"),
-        (.media, "https://www.rollingstone.com/music/music-news/feed/"),
+    private static let ideaFeeds = feedList(.ideas, [
+        "https://www.themarginalian.org/feed/",
+        "https://aeon.co/feed.rss",
+        "https://nautil.us/feed/",
+        "https://seths.blog/feed",
+        "https://fs.blog/feed/",
+        "https://waitbutwhy.com/feed",
+        "https://www.lesswrong.com/feed.xml",
+        "https://www.ribbonfarm.com/feed/",
+        "https://www.gatesnotes.com/rss",
+        "https://psyche.co/feed.rss",
+        "https://noahpinion.substack.com/feed",
+        "https://astralcodexten.substack.com/feed",
+        "https://www.edge.org/feed",
+        "https://jamesclear.com/feed",
+        "https://www.slowboring.com/feed",
+        "https://www.freethink.com/feed",
+        "https://worksinprogress.co/feed",
+        "https://theconversation.com/articles.atom",
+        "https://nesslabs.com/feed",
+        "https://www.lrb.co.uk/feeds/posts"
+    ])
 
-        // 科学
-        (.science, "https://www.nature.com/nature.rss"),
-        (.science, "https://www.science.org/action/showFeed?type=etoc&feed=rss&jc=science"),
-        (.science, "https://www.nasa.gov/rss/dyn/breaking_news.rss"),
-        (.science, "https://www.cell.com/atom/rss"),
-        (.science, "https://www.quantamagazine.org/feed/"),
+    private static let mediaFeeds = feedList(.media, [
+        "https://www.theatlantic.com/feed/all/",
+        "https://variety.com/feed/",
+        "https://www.newyorker.com/feed/everything",
+        "https://www.vulture.com/rss/index.xml",
+        "https://www.rollingstone.com/music/music-news/feed/",
+        "https://pitchfork.com/feed/feed-news/rss",
+        "https://www.billboard.com/feed/",
+        "https://www.hollywoodreporter.com/t/hollywood-reporter-news/feed/",
+        "https://decider.com/feed/",
+        "https://consequence.net/feed/",
+        "https://www.npr.org/rss/rss.php?id=1008",
+        "https://www.slate.com/feed",
+        "https://www.avclub.com/rss",
+        "https://www.polygon.com/rss/index.xml",
+        "https://www.gamesradar.com/feeds/all",
+        "https://www.rollingstone.com/culture/culture-news/feed/",
+        "https://www.pastemagazine.com/.rss/full/",
+        "https://www.denofgeek.com/feed/",
+        "https://www.vox.com/rss/index.xml",
+        "https://www.dailywire.com/feeds/latest"
+    ])
 
-        // 体育
-        (.sports, "https://www.espn.com/espn/rss/news"),
-        (.sports, "https://feeds.bbci.co.uk/sport/rss.xml?edition=uk"),
-        (.sports, "https://www.skysports.com/rss/12040"),
-        (.sports, "https://www.si.com/rss/si_topstories.rss"),
-        (.sports, "https://www.reuters.com/sports/rss"),
+    private static let scienceFeeds = feedList(.science, [
+        "https://www.nature.com/nature.rss",
+        "https://www.science.org/action/showFeed?type=etoc&feed=rss&jc=science",
+        "https://www.nasa.gov/rss/dyn/breaking_news.rss",
+        "https://www.cell.com/atom/rss",
+        "https://www.quantamagazine.org/feed/",
+        "https://www.sciencedaily.com/rss/top/science.xml",
+        "https://www.newscientist.com/feed/home/",
+        "https://www.livescience.com/home/feed/site.xml",
+        "https://www.scientificamerican.com/feed/",
+        "https://www.space.com/feeds/all",
+        "https://www.popsci.com/feed/",
+        "https://www.smithsonianmag.com/rss/science-nature/",
+        "https://www.eurekalert.org/rss.xml",
+        "https://www.nature.com/subjects/environmental-sciences.rss",
+        "https://www.nih.gov/news-events/news-releases/feed",
+        "https://www.sciencenews.org/feed",
+        "https://www.symmetrymagazine.org/feed",
+        "https://www.chemistryworld.com/rss",
+        "https://www.azocleantech.com/xml/news.xml",
+        "https://www.jpl.nasa.gov/feeds/news"
+    ])
 
-        // 财经
-        (.finance, "https://feeds.a.dj.com/rss/RSSMarketsMain.xml"),
-        (.finance, "https://www.ft.com/?format=rss"),
-        (.finance, "https://www.cnbc.com/id/100003114/device/rss/rss.html"),
-        (.finance, "https://finance.yahoo.com/news/rssindex"),
-        (.finance, "https://www.bloomberg.com/feeds/podcasts/etf-report.xml")
-    ]
+    private static let sportsFeeds = feedList(.sports, [
+        "https://www.espn.com/espn/rss/news",
+        "https://feeds.bbci.co.uk/sport/rss.xml?edition=uk",
+        "https://www.skysports.com/rss/12040",
+        "https://www.si.com/rss/si_topstories.rss",
+        "https://www.reuters.com/sports/rss",
+        "https://bleacherreport.com/articles?format=atom",
+        "https://www.cbssports.com/rss/headlines/",
+        "https://sports.yahoo.com/rss/",
+        "https://www.nbcsports.com/rss",
+        "https://www.nhl.com/rss/news",
+        "https://www.nba.com/news/feed",
+        "https://www.mlb.com/news/feeds/rss.xml",
+        "https://www.fifa.com/rss-feeds/news",
+        "https://www.formula1.com/rss/news/all",
+        "https://www.motogp.com/en/rss",
+        "https://www.uefa.com/rssfeed/uefacom-overview-news/",
+        "https://www.goal.com/feeds/en/news",
+        "https://cyclingtips.com/feed/",
+        "https://www.runnersworld.com/rss/all.xml",
+        "https://www.espn.com/espn/rss/nfl/news"
+    ])
+
+    private static let financeFeeds = feedList(.finance, [
+        "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
+        "https://www.ft.com/?format=rss",
+        "https://www.cnbc.com/id/100003114/device/rss/rss.html",
+        "https://finance.yahoo.com/news/rssindex",
+        "https://www.bloomberg.com/feeds/podcasts/etf-report.xml",
+        "https://www.marketwatch.com/feeds/topstories",
+        "https://seekingalpha.com/market_currents.xml",
+        "https://www.investopedia.com/feedbuilder/feed/getfeed/?feedName=rss_headline",
+        "https://www.benzinga.com/feed",
+        "https://cointelegraph.com/rss",
+        "https://www.coindesk.com/arc/outboundfeeds/rss/",
+        "https://www.fool.com/feeds/index.aspx",
+        "https://www.kitco.com/rss/news/",
+        "https://www.zerohedge.com/feed",
+        "https://www.theblock.co/rss.xml",
+        "https://www.businesstimes.com.sg/feeds/latest",
+        "https://asia.nikkei.com/rss/feed/nar",
+        "https://www.handelsblatt.com/contentexport/feed/schlagzeilen",
+        "https://hbr.org/feed",
+        "https://www.pehub.com/feed/"
+    ])
+
+    private static func feedList(_ category: FeedCategory, _ urls: [String]) -> [(FeedCategory, String)] {
+        urls.map { (category, $0) }
+    }
 
     /// 拉取默认源
-    static func ingestDefault(limitPerFeed: Int = 3) async -> [FeedItem] {
+    static func ingestDefault(limitPerFeed: Int = 3, progress: ((Int, Int) -> Void)? = nil) async -> [FeedItem] {
         var result: [FeedItem] = []
+        let total = defaultFeeds.count
+        progress?(0, total)
+        var finished = 0
         for (cat, urlStr) in defaultFeeds {
             guard let url = URL(string: urlStr) else { continue }
             do {
@@ -76,6 +219,8 @@ enum FeedIngestor {
                 print("RSS ingest failed:", urlStr, error.localizedDescription)
                 #endif
             }
+            finished += 1
+            progress?(finished, total)
         }
         // 去重（按 link）
         var seen = Set<String>()
